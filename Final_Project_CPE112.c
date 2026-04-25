@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#define ALL 13             //ACE - KING
 
 int deck();
 int move();
@@ -21,7 +22,7 @@ typedef struct card {
 
 int deck() {
     char suit[4] = {"♠", "♥", "♦", "♣"};
-    for(int i = 0; i < 13; i++) {
+    for(int i = 1; i <= 13; i++) { //1 = ACE, 11 = JACK, 12 = QUEEN, 13 = KING
         
     }
 }
