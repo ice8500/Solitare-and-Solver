@@ -1,0 +1,114 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+#include <time.h>
+#define MAXSIZE 52 //MAXIMUM DECK SIZE
+
+int deck();
+int move();
+int next();
+int undo();
+int solver();
+int next_column();          //circular_linked-list
+int initail_column();       //linked-list
+int complete_stack();       //stack
+
+// ♠ ♥ ♦ ♣
+int decksize = 0; //to make sure that the decksize will not overflow or underflow
+
+//Deck Stack
+typedef struct stack{ //Deck Stack (Will be to store the shuffeled card)
+  Card *top;
+  int totalcount;
+} DeckStack;
+
+//Help Create Card
+Card *createcard(int rank, char *suit){
+    Card *card = (Card *)malloc(sizeof(Card));
+    card->rank = rank;
+    card->suit = suit;
+    card->Faceup = 0; //Not used yet, will become 1 once it has been open
+    card->next = NULL;
+    card->prev = NULL;
+    return card;
+}//Implemented by 3448; To create a card in the doubly linked list
+
+typedef struct Card {
+    int num;
+    bool Faceup;
+    int rank;
+    char *suit; //Need to be pointer because we use emoji not normal alphabet
+    struct Card * next;
+    struct Card * prev;
+} Card;
+
+void push(DeckStack *s, Card *c){
+  if(c == NULL){
+    printf("UnderFlow Error");
+    return 0;
+  }
+  s->top = c;
+  s->top++;
+  s->totalcount++;
+}
+
+Card *pop(DeckStack *s){
+  
+
+}
+
+/*int deck() {
+    Card *head = NULL;
+    Card *tail = NULL;
+    char suit[4] = {"♠", "♥", "♦", "♣"};
+    for(int i = 0; i < 4; i++){
+        for(int j = 1; j <= 13; j++){
+                Card *newCard = createcard(j, suit[i]);
+                if (head == NULL){
+                    head = newCard;
+                    tail = newCard;
+                    newCard->prev = NULL;
+                }
+                else{
+                    newCard->prev = tail;
+                    tail->next = newCard;
+                    tail = newCard;
+                }
+                decksize++;
+                if(decksize > 52){
+                  printf("Error Enounter"); //prevent overflow
+                  return 0;
+                }
+            }
+    }
+} //Implemented by 3448; initalizing the deck by using doubly linked list starting from each suits, and from ace to king 
+ */
+
+DeckStack IntRandomCardDeck(){
+  char *suit[4] = {"♠", "♥", "♦", "♣"};
+  Card *tempDeck[52];
+  int cardNum = 1;
+
+  for(int i = 0; i < 4; i++){
+    for(int j = 1; j <= 13; j++){
+      tempDeck[cardNum++] == createcard(j, suit[i]); //Should Store All 52 Card in order to the temp deck now
+    }
+  }
+
+  for(int i = 52; i > 0; i--){ 
+    int random = rand() % i;
+    Card *temp = tempDeck[i];
+        tempDeck[i] = tempDeck[random];
+        tempDeck[random] = temp;
+  }
+}
+Card drawCard(){
+
+}
+int main() {
+
+}
+
+
+

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#define ALL 13             //ACE - KING
 
 int deck();
 int move();
