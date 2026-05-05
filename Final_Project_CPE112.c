@@ -70,7 +70,7 @@ DeckStack createShuffledDeck(){
         for(int j = 1; j <= 13; j++){
             temp[cardNum++] = createcard(j, suits[i]); //Should Store All 52 Card in order to the temp deck now
         }
-    }
+    }//Implemented by 3448;
 
     // Shuffling
     for(int i = 51; i > 0; i--){
