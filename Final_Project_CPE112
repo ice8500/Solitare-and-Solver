@@ -5,7 +5,10 @@
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
+
+#ifdef _WIN32 // Check if run on Windows
 #include <windows.h>
+#endif
 
 #define MAXSIZE 52 // MAXIMUM DECK SIZE
 
@@ -1431,7 +1434,9 @@ bool checkWin(DeckStack foundation[4])
 
 int main()
 {
-    SetConsoleOutputCP(CP_UTF8); // Force the Terminal to use UTF-8 Encoding
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
 
     srand(time(NULL));
 
@@ -1512,7 +1517,7 @@ int main()
 
         printf("\n0 = Waste | 1-7 = Columns | 8-11 = Foundation\n");
 
-        printf("Command (/stock, /move from amount to, /hint, /undo, /quit): ");
+        printf("Command (/stock, /move from amount to, /hint, /undo, /help, /quit): ");
 
         fgets(cmd,
               sizeof(cmd),
@@ -1628,6 +1633,25 @@ int main()
                 &stock,
                 &waste,
                 &undoTop);
+        }
+
+        // Help
+        else if (strcmp(cmd,
+                        "/help") == 0)
+        {
+            printf("\n  +----------------------------------- GAME COMMANDS ------------------------------------+\n");
+            printf("  |                                                                                      |\n");
+            printf("  |  Locations: 0 = Waste | 1-7 = Columns | 8-11 = Foundations.                          |\n");
+            printf("  |                                                                                      |\n");
+            printf("  |  /stock : Draw 3 cards from stock to waste.                                          |\n");
+            printf("  |  /move  : Move revealed cards between stacks.                                        |\n");
+            printf("  |           (e.g., '/move 1 2 8' is to move 2 cards from Column 1 to Foundation 8)     |\n");
+            printf("  |  /hint  : Display the best possible move.                                            |\n");
+            printf("  |  /undo  : Reverse the last action.                                                   |\n");
+            printf("  |  /help  : Display this help message.                                                 |\n");
+            printf("  |  /quit  : Exit the program.                                                          |\n");
+            printf("  |                                                                                      |\n");
+            printf("  +--------------------------------------------------------------------------------------+\n");
         }
 
         // Quit
