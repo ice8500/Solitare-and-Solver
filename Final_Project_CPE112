@@ -1255,6 +1255,15 @@ void undoLastMove(DeckStack tableau[7],
 
     free(u);
 }
+// PRINT 1, 11, 12, 13 TO A, J, Q, K
+const char* getRankStr(int rank) {
+    static const char* ranks[] = {"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+    
+    if (rank >= 1 && rank <= 13) {
+        return ranks[rank];
+    }
+    return "?"; // <- For invalid ranks
+}
 
 // PRINT WASTE
 
@@ -1291,8 +1300,8 @@ void printWaste(DeckStack *waste)
         if (index >= skip)
         {
 
-            printf("%d%s ",
-                   temp->rank,
+            printf("%s%s ",
+                   getRankStr(temp->rank),
                    temp->suit);
         }
 
@@ -1332,8 +1341,8 @@ void printFoundation(DeckStack foundation[4])
         else
         {
 
-            printf("%d%s",
-                   top->rank,
+            printf("%s%s",
+                   getRankStr(top->rank),
                    top->suit);
         }
 
@@ -1365,8 +1374,8 @@ void printTableau(DeckStack tableau[7])
         {
 
             if (temp->Faceup)
-                printf("%d%s ",
-                       temp->rank,
+                printf("%s%s ",
+                       getRankStr(temp->rank),
                        temp->suit);
             else
                 printf("XX ");
