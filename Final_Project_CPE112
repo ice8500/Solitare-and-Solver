@@ -5,7 +5,8 @@
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
- 
+#include <windows.h>
+
 #define MAXSIZE 52 // MAXIMUM DECK SIZE
 
 // ♠ ♥ ♦ ♣
@@ -1430,6 +1431,7 @@ bool checkWin(DeckStack foundation[4])
 
 int main()
 {
+    SetConsoleOutputCP(CP_UTF8); // Force the Terminal to use UTF-8 Encoding
 
     srand(time(NULL));
 
