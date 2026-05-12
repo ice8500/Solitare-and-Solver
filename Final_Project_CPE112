@@ -1,0 +1,1678 @@
+// SOLITAIRE IN C
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <time.h>
+#include <string.h>
+
+#define MAXSIZE 52 // MAXIMUM DECK SIZE
+
+// ♠ ♥ ♦ ♣
+
+// Cards
+typedef struct Card
+{
+
+    int rank;
+    char *suit; // Need to be pointer because we use emoji not normal alphabet
+    bool Faceup;
+
+    struct Card *next;
+    struct Card *prev;
+
+} Card;
+
+// Stack
+typedef struct
+{
+
+    Card *top;
+    int totalcount;
+
+} DeckStack;
+
+// Hint Move
+typedef struct
+{
+
+    int from;
+    int amount;
+    int to;
+    int score;
+
+} Hint;
+
+// UNDO MOVE
+
+typedef struct UndoMove
+{
+
+    int from;
+    int to;
+    int amount;
+
+    bool flippedCard;
+
+    bool wasStockDraw;
+
+    struct UndoMove *next;
+
+} UndoMove;
+
+// CREATE CARD
+
+
+Card *createcard(int rank,
+                 char *suit)
+{
+
+    Card *c = malloc(sizeof(Card));
+
+    c->rank = rank;
+    c->suit = suit;
+
+    c->Faceup = false;
+
+    c->next = NULL;
+    c->prev = NULL;
+
+    return c;
+}
+
+// PUSH TOP
+
+void push(DeckStack *s,
+          Card *c)
+{
+
+    if (c == NULL)
+        return;
+
+    c->next = s->top;
+
+    if (s->top != NULL)
+        s->top->prev = c;
+
+    s->top = c;
+
+    s->totalcount++;
+}
+
+// PUSH BOTTOM
+
+void pushBottom(DeckStack *s,
+                Card *c)
+{
+
+    if (c == NULL)
+        return;
+
+    c->next = NULL;
+    c->prev = NULL;
+
+    // Empty
+    if (s->top == NULL)
+    {
+
+        s->top = c;
+        s->totalcount++;
+
+        return;
+    }
+
+    Card *temp = s->top;
+
+    while (temp->next != NULL)
+    {
+
+        temp = temp->next;
+    }
+
+    temp->next = c;
+    c->prev = temp;
+
+    s->totalcount++;
+}
+
+// POP TOP
+
+Card *pop(DeckStack *s)
+{
+
+    if (s->top == NULL)
+        return NULL;
+
+    Card *c = s->top;
+
+    s->top = c->next;
+
+    if (s->top != NULL)
+        s->top->prev = NULL;
+
+    c->next = NULL;
+    c->prev = NULL;
+
+    s->totalcount--;
+
+    return c;
+}
+
+// GET BOTTOM CARD
+
+Card *getBottomCard(DeckStack *s)
+{
+
+    if (s->top == NULL)
+        return NULL;
+
+    Card *temp = s->top;
+
+    while (temp->next != NULL)
+    {
+
+        temp = temp->next;
+    }
+
+    return temp;
+}
+
+// DETACH STACK
+
+Card *detachStack(DeckStack *s,
+                  int amount)
+{
+
+    if (s->top == NULL)
+        return NULL;
+
+    Card *temp =
+        getBottomCard(s);
+
+    for (int i = 1;
+         i < amount;
+         i++)
+    {
+
+        if (temp->prev == NULL)
+        {
+
+            return NULL;
+        }
+
+        temp = temp->prev;
+    }
+
+    // Cannot Move Facedown
+    if (temp->Faceup == false)
+    {
+
+        return NULL;
+    }
+
+    // Validate Internal Stack
+    Card *check = temp;
+
+    while (check->next != NULL)
+    {
+
+        Card *next =
+            check->next;
+
+        bool sameColor =
+
+            (strcmp(check->suit, "♥") == 0 ||
+             strcmp(check->suit, "♦") == 0)
+
+            ==
+
+            (strcmp(next->suit, "♥") == 0 ||
+             strcmp(next->suit, "♦") == 0);
+
+        if (sameColor)
+        {
+
+            return NULL;
+        }
+
+        if (check->rank !=
+            next->rank + 1)
+        {
+
+            return NULL;
+        }
+
+        check = next;
+    }
+
+    // Detach
+    if (temp->prev != NULL)
+    {
+
+        temp->prev->next = NULL;
+        temp->prev = NULL;
+    }
+    else
+    {
+
+        s->top = NULL;
+    }
+
+    s->totalcount -= amount;
+
+    return temp;
+}
+
+// DETACH WITHOUT VALIDATION
+
+Card *detachWithoutValidation(DeckStack *s,
+                              int amount)
+{
+
+    if (s->top == NULL)
+        return NULL;
+
+    Card *temp =
+        getBottomCard(s);
+
+    for (int i = 1;
+         i < amount;
+         i++)
+    {
+
+        if (temp->prev == NULL)
+        {
+
+            return NULL;
+        }
+
+        temp = temp->prev;
+    }
+
+    // Detach ONLY
+    if (temp->prev != NULL)
+    {
+
+        temp->prev->next = NULL;
+        temp->prev = NULL;
+    }
+    else
+    {
+
+        s->top = NULL;
+    }
+
+    s->totalcount -= amount;
+
+    return temp;
+}
+
+// ATTACH STACK
+
+void attachStack(DeckStack *s,
+                 Card *stack)
+{
+
+    if (stack == NULL)
+        return;
+
+    // Empty
+    if (s->top == NULL)
+    {
+
+        s->top = stack;
+
+        Card *count = stack;
+
+        while (count != NULL)
+        {
+
+            s->totalcount++;
+            count = count->next;
+        }
+
+        return;
+    }
+
+    Card *bottom =
+        getBottomCard(s);
+
+    bottom->next = stack;
+    stack->prev = bottom;
+
+    Card *count = stack;
+
+    while (count != NULL)
+    {
+
+        s->totalcount++;
+        count = count->next;
+    }
+}
+
+// CREATE SHUFFLED DECK
+
+DeckStack createShuffledDeck()
+{
+
+    char *suits[4] = {
+
+        "♠",
+        "♥",
+        "♦",
+        "♣"};
+
+    Card *temp[52];
+
+    int cardNum = 0;
+
+    // Ordered Deck
+    for (int i = 0;
+         i < 4;
+         i++)
+    {
+
+        for (int j = 1;
+             j <= 13;
+             j++)
+        {
+
+            temp[cardNum++] =
+                createcard(j,
+                           suits[i]);
+        }
+    }
+
+    // Shuffle
+    for (int i = 51;
+         i > 0;
+         i--)
+    {
+
+        int r =
+            rand() % (i + 1);
+
+        Card *t = temp[i];
+
+        temp[i] = temp[r];
+        temp[r] = t;
+    }
+
+    DeckStack deck;
+
+    deck.top = NULL;
+    deck.totalcount = 0;
+
+    for (int i = 0;
+         i < 52;
+         i++)
+    {
+
+        push(&deck,
+             temp[i]);
+    }
+
+    return deck;
+}
+
+// RECYCLE STOCK
+
+void recycleStock(DeckStack *stock,
+                  DeckStack *waste)
+{
+
+    if (waste->top == NULL)
+    {
+
+        printf("No cards to recycle.\n");
+        return;
+    }
+
+    printf("Recycling waste back into stock\n");
+
+    Card *c;
+
+    while ((c = detachWithoutValidation(waste, 1)) != NULL)
+    {
+
+        c->Faceup = false;
+
+        push(stock, c);
+    }
+}
+
+// DRAW FROM STOCK
+
+void drawFromStock(DeckStack *stock,
+                   DeckStack *waste)
+{
+
+    for (int i = 0;
+         i < 3;
+         i++)
+    {
+
+        if (stock->top == NULL)
+        {
+
+            recycleStock(stock,
+                         waste);
+        }
+
+        Card *c = pop(stock);
+
+        if (c == NULL)
+            return;
+
+        c->Faceup = true;
+
+        pushBottom(waste, c);
+    }
+}
+
+// IS RED
+
+bool isRed(Card *c)
+{
+
+    return
+
+        strcmp(c->suit, "♥") == 0 ||
+
+        strcmp(c->suit, "♦") == 0;
+}
+
+// CAN MOVE
+
+bool canMove(Card *moving,
+             Card *dest)
+{
+    // SAFETY CHECK
+    if (moving == NULL)
+    {
+        return false;
+    }
+
+    // Empty Only King
+    if (dest == NULL)
+    {
+
+        return moving->rank == 13;
+    }
+
+    // Alternate Color
+    if (isRed(moving) ==
+        isRed(dest))
+    {
+
+        return false;
+    }
+
+    // Descending
+    if (moving->rank !=
+        dest->rank - 1)
+    {
+
+        return false;
+    }
+
+    return true;
+}
+
+// CAN MOVE FOUNDATION
+
+bool canMoveToFoundation(Card *moving,
+                         DeckStack *foundation)
+{
+
+    // SAFETY CHECK
+    if (moving == NULL)
+    {
+        return false;
+    }
+
+    // Empty -> Ace
+    if (foundation->top == NULL)
+    {
+
+        return moving->rank == 1;
+    }
+
+    Card *top =
+        getBottomCard(foundation);
+
+    // Same Suit
+    if (strcmp(moving->suit,
+               top->suit) != 0)
+    {
+
+        return false;
+    }
+
+    // Ascending
+    if (moving->rank !=
+        top->rank + 1)
+    {
+
+        return false;
+    }
+
+    return true;
+}
+
+// EVALUATE MOVE
+
+int evaluateMove(DeckStack tableau[7],
+                 int from,
+                 int amount,
+                 int to)
+{
+
+    int score = 0;
+
+    // Foundation Good
+    if (to >= 8 &&
+        to <= 11)
+    {
+
+        score += 100;
+    }
+
+    // Empty Column Good
+    if (to >= 1 &&
+        to <= 7)
+    {
+
+        if (tableau[to - 1].top == NULL)
+        {
+
+            score += 60;
+        }
+    }
+
+    // Reveal Hidden Card
+    if (from >= 1 &&
+        from <= 7)
+    {
+
+        DeckStack *src =
+            &tableau[from - 1];
+
+        Card *bottom =
+            getBottomCard(src);
+
+        if (bottom != NULL &&
+            bottom->prev != NULL &&
+            bottom->prev->Faceup == false)
+        {
+
+            score += 80;
+        }
+    }
+
+    // Bigger Stack Better
+    score += amount * 5;
+
+    return score;
+}
+
+// FIND BEST HINT
+
+Hint findBestHint(DeckStack tableau[7],
+                  DeckStack foundation[4],
+                  DeckStack *waste)
+{
+
+    Hint best;
+
+    best.from = -1;
+    best.amount = 0;
+    best.to = -1;
+    best.score = -1;
+
+    // Tableau Moves
+    for (int from = 1;
+         from <= 7;
+         from++)
+    {
+
+        DeckStack *src =
+            &tableau[from - 1];
+
+        int max =
+            src->totalcount;
+
+        for (int amount = 1;
+             amount <= max;
+             amount++)
+        {
+
+            Card *moving =
+                detachWithoutValidation(src,
+                                        amount);
+
+            if (moving == NULL)
+            {
+                continue;
+            }
+
+            if (moving->Faceup == false)
+            {
+                attachStack(src, moving);
+                continue;
+            }
+
+            Card *check = moving;
+
+            bool valid = true;
+
+            while (check->next != NULL)
+            {
+                Card *next = check->next;
+
+                bool sameColor =
+
+                    (strcmp(check->suit, "♥") == 0 ||
+                     strcmp(check->suit, "♦") == 0)
+
+                    ==
+
+                    (strcmp(next->suit, "♥") == 0 ||
+                     strcmp(next->suit, "♦") == 0);
+
+                if (sameColor)
+                {
+                    valid = false;
+                    break;
+                }
+
+                if (check->rank != next->rank + 1)
+                {
+                    valid = false;
+                    break;
+                }
+
+                check = next;
+            }
+
+            if (!valid)
+            {
+                attachStack(src, moving);
+                continue;
+            }
+
+            // Tableau Destination
+            for (int to = 1;
+                 to <= 7;
+                 to++)
+            {
+
+                if (to == from)
+                    continue;
+
+                Card *dest =
+                    getBottomCard(
+                        &tableau[to - 1]);
+
+                if (canMove(moving,
+                            dest))
+                {
+
+                    int score =
+                        evaluateMove(
+                            tableau,
+                            from,
+                            amount,
+                            to);
+
+                    if (score > best.score)
+                    {
+
+                        best.from = from;
+                        best.amount = amount;
+                        best.to = to;
+                        best.score = score;
+                    }
+                }
+            }
+
+            // Foundation Destination
+            for (int to = 8;
+                 to <= 11;
+                 to++)
+            {
+
+                if (amount != 1)
+                    continue;
+
+                int f = to - 8;
+
+                if (canMoveToFoundation(
+                        moving,
+                        &foundation[f]))
+                {
+
+                    int score =
+                        evaluateMove(
+                            tableau,
+                            from,
+                            amount,
+                            to);
+
+                    if (score > best.score)
+                    {
+
+                        best.from = from;
+                        best.amount = amount;
+                        best.to = to;
+                        best.score = score;
+                    }
+                }
+            }
+
+            attachStack(src,
+                        moving);
+            moving = NULL;
+        }
+    }
+
+    // Waste Moves
+    Card *wasteCard =
+        getBottomCard(waste);
+
+    if (wasteCard != NULL)
+    {
+
+        // Waste -> Tableau
+        for (int to = 1;
+             to <= 7;
+             to++)
+        {
+
+            Card *dest =
+                getBottomCard(
+                    &tableau[to - 1]);
+
+            if (canMove(wasteCard,
+                        dest))
+            {
+
+                int score =
+                    evaluateMove(
+                        tableau,
+                        0,
+                        1,
+                        to);
+
+                if (score > best.score)
+                {
+
+                    best.from = 0;
+                    best.amount = 1;
+                    best.to = to;
+                    best.score = score;
+                }
+            }
+        }
+    }
+
+    // Waste -> Foundation
+    if (wasteCard != NULL)
+    {
+        for (int to = 8;
+             to <= 11;
+             to++)
+        {
+
+            int f = to - 8;
+
+            if (canMoveToFoundation(
+                    wasteCard,
+                    &foundation[f]))
+            {
+
+                int score =
+                    evaluateMove(
+                        tableau,
+                        0,
+                        1,
+                        to);
+
+                if (score > best.score)
+                {
+
+                    best.from = 0;
+                    best.amount = 1;
+                    best.to = to;
+                    best.score = score;
+                }
+            }
+        }
+    }
+
+    return best;
+}
+
+// SAVE UNDO
+
+void saveUndo(UndoMove **undoTop,
+              int from,
+              int to,
+              int amount,
+              bool flippedCard,
+              bool wasStockDraw)
+{
+
+    UndoMove *u =
+        malloc(sizeof(UndoMove));
+
+    u->from = from;
+    u->to = to;
+    u->amount = amount;
+
+    u->flippedCard = flippedCard;
+
+    u->wasStockDraw = wasStockDraw;
+
+    u->next = *undoTop;
+
+    *undoTop = u;
+}
+
+// MOVE CARDS
+
+void moveCards(DeckStack tableau[7],
+               DeckStack foundation[4],
+               DeckStack *waste,
+               UndoMove **undoTop,
+               int from,
+               int amount,
+               int to)
+{
+
+    int fromIndex = from - 1;
+    int toIndex = to - 1;
+
+    bool toFoundation =
+        (to >= 8 && to <= 11);
+    bool flipped = false;
+
+    // Waste Move
+    if (from == 0)
+    {
+
+        if (amount != 1)
+        {
+
+            printf("Can only move 1 card from waste\n");
+            return;
+        }
+
+        Card *moving =
+            detachWithoutValidation(waste,
+                                    1);
+
+        if (moving == NULL)
+        {
+
+            printf("Waste is empty\n");
+            return;
+        }
+
+        // Waste -> Foundation
+        if (toFoundation)
+        {
+
+            int f = to - 8;
+
+            if (canMoveToFoundation(
+                    moving,
+                    &foundation[f]))
+            {
+
+                pushBottom(
+                    &foundation[f],
+                    moving);
+
+                printf("Moved waste card to Foundation %d\n",
+                       to);
+            }
+            else
+            {
+
+                pushBottom(waste,
+                           moving);
+
+                printf("Illegal foundation move\n");
+            }
+
+            return;
+        }
+
+        // Waste -> Tableau
+        if (to < 1 ||
+            to > 7)
+        {
+
+            pushBottom(waste,
+                       moving);
+
+            printf("Invalid destination\n");
+            return;
+        }
+
+        Card *dest =
+            getBottomCard(
+                &tableau[toIndex]);
+
+        if (canMove(moving,
+                    dest))
+        {
+
+            pushBottom(
+                &tableau[toIndex],
+                moving);
+
+            printf("Moved waste card to Col %d\n",
+                   to);
+        }
+        else
+        {
+
+            pushBottom(waste,
+                       moving);
+
+            printf("Illegal move\n");
+        }
+
+        return;
+    }
+
+    // Tableau Source
+    if (from < 1 ||
+        from > 7)
+    {
+
+        printf("Invalid source column\n");
+        return;
+    }
+
+    Card *moving =
+        detachStack(
+            &tableau[fromIndex],
+            amount);
+
+    if (moving == NULL)
+    {
+
+        printf("Cannot move stack\n");
+        return;
+    }
+
+    // Tableau -> Foundation
+    if (toFoundation)
+    {
+
+        if (amount != 1)
+        {
+
+            attachStack(
+                &tableau[fromIndex],
+                moving);
+
+            printf("Can only move 1 card to foundation\n");
+            return;
+        }
+
+        int f = to - 8;
+
+        if (canMoveToFoundation(
+                moving,
+                &foundation[f]))
+        {
+
+            pushBottom(
+                &foundation[f],
+                moving);
+
+            Card *flip =
+                getBottomCard(
+                    &tableau[fromIndex]);
+
+            if (flip != NULL &&
+                flip->Faceup == false)
+            {
+
+                flip->Faceup = true;
+
+                flipped = true;
+            }
+
+            printf("Moved to Foundation %d\n",
+                   to);
+
+            saveUndo(
+                undoTop,
+                from,
+                to,
+                amount,
+                flipped,
+                false);
+        }
+        else
+        {
+
+            attachStack(
+                &tableau[fromIndex],
+                moving);
+
+            printf("Illegal foundation move\n");
+        }
+
+        return;
+    }
+
+    // Tableau -> Tableau
+    if (to < 1 ||
+        to > 7)
+    {
+
+        attachStack(
+            &tableau[fromIndex],
+            moving);
+
+        printf("Invalid destination\n");
+        return;
+    }
+
+    Card *dest =
+        getBottomCard(
+            &tableau[toIndex]);
+
+    if (canMove(moving,
+                dest))
+    {
+
+        attachStack(
+            &tableau[toIndex],
+            moving);
+
+        Card *flip =
+            getBottomCard(
+                &tableau[fromIndex]);
+
+        if (flip != NULL &&
+            flip->Faceup == false)
+        {
+
+            flip->Faceup = true;
+
+            flipped = true;
+        }
+
+        printf("Moved %d cards from Col %d to Col %d\n",
+               amount,
+               from,
+               to);
+
+        saveUndo(
+            undoTop,
+            from,
+            to,
+            amount,
+            flipped,
+            false);
+    }
+    else
+    {
+
+        attachStack(
+            &tableau[fromIndex],
+            moving);
+
+        printf("Illegal move\n");
+    }
+}
+
+// UNDO LAST MOVE
+
+void undoLastMove(DeckStack tableau[7],
+                  DeckStack foundation[4],
+                  DeckStack *stock,
+                  DeckStack *waste,
+                  UndoMove **undoTop)
+{
+
+    if (*undoTop == NULL)
+    {
+
+        printf("Nothing to undo\n");
+        return;
+    }
+
+    UndoMove *u = *undoTop;
+
+    *undoTop = u->next;
+
+    // Undo Stock Draw
+    if (u->wasStockDraw)
+    {
+
+        for (int i = 0;
+             i < u->amount;
+             i++)
+        {
+
+            Card *c =
+                getBottomCard(waste);
+
+            if (c == NULL)
+                break;
+
+            if (c->prev != NULL)
+            {
+
+                c->prev->next = NULL;
+            }
+            else
+            {
+
+                waste->top = NULL;
+            }
+
+            waste->totalcount--;
+
+            c->next = NULL;
+            c->prev = NULL;
+
+            c->Faceup = false;
+
+            push(stock,
+                 c);
+        }
+
+        printf("Undid stock draw\n");
+    }
+
+    // Undo Normal Move
+    else
+    {
+
+        DeckStack *fromStack = NULL;
+        DeckStack *toStack = NULL;
+
+        if (u->to >= 1 &&
+            u->to <= 7)
+        {
+
+            toStack =
+                &tableau[u->to - 1];
+        }
+        else
+        {
+
+            toStack =
+                &foundation[u->to - 8];
+        }
+
+        if (u->from >= 1 &&
+            u->from <= 7)
+        {
+
+            fromStack =
+                &tableau[u->from - 1];
+        }
+        else
+        {
+
+            fromStack =
+                &foundation[u->from - 8];
+        }
+
+        Card *stack =
+            detachWithoutValidation(
+                toStack,
+                u->amount);
+
+        attachStack(
+            fromStack,
+            stack);
+
+        if (u->flippedCard)
+        {
+
+            Card *bottom =
+                getBottomCard(fromStack);
+
+            if (bottom != NULL)
+            {
+                bottom->Faceup = false;
+            }
+        }
+
+        printf("Move undone\n");
+    }
+
+    free(u);
+}
+
+// PRINT WASTE
+
+void printWaste(DeckStack *waste)
+{
+
+    printf("Waste (0): ");
+
+    int total = 0;
+
+    Card *count =
+        waste->top;
+
+    while (count != NULL)
+    {
+
+        total++;
+        count = count->next;
+    }
+
+    int skip = total - 3;
+
+    if (skip < 0)
+        skip = 0;
+
+    Card *temp =
+        waste->top;
+
+    int index = 0;
+
+    while (temp != NULL)
+    {
+
+        if (index >= skip)
+        {
+
+            printf("%d%s ",
+                   temp->rank,
+                   temp->suit);
+        }
+
+        temp = temp->next;
+        index++;
+    }
+
+    printf("\n");
+}
+
+// PRINT FOUNDATION
+
+void printFoundation(DeckStack foundation[4])
+{
+
+    printf("\n=-= FOUNDATION =-=\n");
+
+    for (int i = 0;
+         i < 4;
+         i++)
+    {
+
+        int col = i + 8;
+
+        printf("%d: ",
+               col);
+
+        Card *top =
+            getBottomCard(
+                &foundation[i]);
+
+        if (top == NULL)
+        {
+
+            printf("[EMPTY]");
+        }
+        else
+        {
+
+            printf("%d%s",
+                   top->rank,
+                   top->suit);
+        }
+
+        printf("\n");
+    }
+
+    printf("--------------------\n");
+}
+
+// PRINT TABLEAU
+
+void printTableau(DeckStack tableau[7])
+{
+
+    printf("\n=-= TABLEAU =-=\n");
+
+    for (int col = 0;
+         col < 7;
+         col++)
+    {
+
+        printf("Col %d: ",
+               col + 1);
+
+        Card *temp =
+            tableau[col].top;
+
+        while (temp != NULL)
+        {
+
+            if (temp->Faceup)
+                printf("%d%s ",
+                       temp->rank,
+                       temp->suit);
+            else
+                printf("XX ");
+
+            temp = temp->next;
+        }
+
+        printf("\n");
+    }
+
+    printf("\n--------------------\n");
+}
+
+// PRINT GAME
+
+void printGame(DeckStack tableau[7],
+               DeckStack foundation[4],
+               DeckStack *stock,
+               DeckStack *waste)
+{
+
+    printTableau(tableau);
+
+    printFoundation(foundation);
+
+    printf("\nStock remaining: %d cards hidden\n",
+           stock->totalcount);
+
+    printWaste(waste);
+}
+
+// CHECK WIN
+
+bool checkWin(DeckStack foundation[4])
+{
+
+    int total = 0;
+
+    for (int i = 0;
+         i < 4;
+         i++)
+    {
+
+        total +=
+            foundation[i].totalcount;
+    }
+
+    return total == 52;
+}
+
+// MAIN
+
+int main()
+{
+
+    srand(time(NULL));
+
+    // Stock
+    DeckStack stock =
+        createShuffledDeck();
+
+    // Waste
+    DeckStack waste;
+
+    waste.top = NULL;
+    waste.totalcount = 0;
+
+    // Tableau
+    DeckStack tableau[7];
+
+    for (int i = 0;
+         i < 7;
+         i++)
+    {
+
+        tableau[i].top = NULL;
+        tableau[i].totalcount = 0;
+    }
+
+    // Foundation
+    DeckStack foundation[4];
+
+    for (int i = 0;
+         i < 4;
+         i++)
+    {
+
+        foundation[i].top = NULL;
+        foundation[i].totalcount = 0;
+    }
+
+    // Undo Stack
+    UndoMove *undoTop = NULL;
+
+    // Deal Tableau
+    for (int col = 0;
+         col < 7;
+         col++)
+    {
+
+        for (int row = 0;
+             row <= col;
+             row++)
+        {
+
+            Card *c =
+                pop(&stock);
+
+            if (row == col)
+            {
+
+                c->Faceup = true;
+            }
+
+            pushBottom(
+                &tableau[col],
+                c);
+        }
+    }
+
+    // First Print
+    printGame(tableau,
+              foundation,
+              &stock,
+              &waste);
+
+    // Commands
+    char cmd[100];
+
+    while (1)
+    {
+
+        printf("\n0 = Waste | 1-7 = Columns | 8-11 = Foundation\n");
+
+        printf("Command (/stock, /move from amount to, /hint, /undo, /quit): ");
+
+        fgets(cmd,
+              sizeof(cmd),
+              stdin);
+
+        cmd[strcspn(cmd,
+                    "\n")] = 0;
+
+        // Stock
+        if (strcmp(cmd,
+                   "/stock") == 0)
+        {
+
+            int before =
+                waste.totalcount;
+
+            drawFromStock(
+                &stock,
+                &waste);
+
+            int drawn =
+                waste.totalcount - before;
+
+            saveUndo(
+                &undoTop,
+                -1,
+                -1,
+                drawn,
+                false,
+                true);
+        }
+
+        // Move
+        else if (strncmp(cmd,
+                         "/move",
+                         5) == 0)
+        {
+
+            int from;
+            int amount;
+            int to;
+
+            if (sscanf(cmd,
+                       "/move %d %d %d",
+                       &from,
+                       &amount,
+                       &to) == 3)
+            {
+
+                moveCards(
+                    tableau,
+                    foundation,
+                    &waste,
+                    &undoTop,
+                    from,
+                    amount,
+                    to);
+            }
+            else
+            {
+
+                printf("Usage: /move from amount to\n");
+            }
+        }
+
+        // Hint
+        else if (strcmp(cmd,
+                        "/hint") == 0)
+        {
+
+            Hint h =
+                findBestHint(
+                    tableau,
+                    foundation,
+                    &waste);
+
+            if (h.score == -1)
+            {
+
+                if (stock.totalcount > 0)
+                {
+
+                    printf("No possible moves found\n");
+                    printf("Try using /stock\n");
+                }
+                else
+                {
+
+                    printf("No possible moves left\n");
+                    printf("Game may be unwinnable\n");
+                }
+            }
+            else
+            {
+
+                printf("\n=== BEST MOVE ===\n");
+
+                printf("/move %d %d %d\n",
+                       h.from,
+                       h.amount,
+                       h.to);
+            }
+        }
+
+        // Undo
+        else if (strcmp(cmd,
+                        "/undo") == 0)
+        {
+
+            undoLastMove(
+                tableau,
+                foundation,
+                &stock,
+                &waste,
+                &undoTop);
+        }
+
+        // Quit
+        else if (strcmp(cmd,
+                        "/quit") == 0)
+        {
+
+            break;
+        }
+
+        // Unknown
+        else
+        {
+
+            printf("Unknown command\n");
+        }
+
+        // WIN CHECK
+
+        if (checkWin(foundation))
+        {
+
+            printf("\n=-=-=-=-=-=-=-=-=-=-=\n");
+            printf("CONGRATULATIONS!\n");
+            printf("YOU WON SOLITAIRE!\n");
+            printf("=-=-=-=-=-=-=-=-=-=-=\n");
+
+            break;
+        }
+
+        // GAME OVER CHECK
+
+        Hint gameCheck =
+            findBestHint(
+                tableau,
+                foundation,
+                &waste);
+
+        if (gameCheck.score == -1 &&
+            stock.totalcount == 0)
+        {
+
+            printf("\n=-=-=-=-=-=-=-=-=-=-=\n");
+            printf("NO MORE POSSIBLE MOVES\n");
+            printf("GAME OVER\n");
+            printf("=-=-=-=-=-=-=-=-=-=-=\n");
+
+            break;
+        }
+
+        // Refresh
+        printGame(tableau,
+                  foundation,
+                  &stock,
+                  &waste);
+    }
+
+    return 0;
+}
