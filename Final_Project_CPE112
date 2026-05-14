@@ -47,6 +47,15 @@ typedef struct
 
 } Hint;
 
+// LAST HINT MEMORY
+
+Hint lastHint =
+    {
+        -1,
+        0,
+        -1,
+        -1};
+
 // UNDO MOVE
 
 typedef struct UndoMove
@@ -65,7 +74,6 @@ typedef struct UndoMove
 } UndoMove;
 
 // CREATE CARD
-
 
 Card *createcard(int rank,
                  char *suit)
@@ -566,6 +574,22 @@ bool canMoveToFoundation(Card *moving,
 
 // EVALUATE MOVE
 
+// CHECK REVERSE LOOP
+
+bool isReverseMove(Hint last,
+                   int from,
+                   int amount,
+                   int to)
+{
+    return
+
+        last.from == to &&
+
+        last.to == from &&
+
+        last.amount == amount;
+}
+
 int evaluateMove(DeckStack tableau[7],
                  int from,
                  int amount,
@@ -729,6 +753,15 @@ Hint findBestHint(DeckStack tableau[7],
                             amount,
                             to);
 
+                    // Prevent Reverse Loop
+                    if (isReverseMove(lastHint,
+                                      from,
+                                      amount,
+                                      to))
+                    {
+                        score -= 200;
+                    }
+
                     if (score > best.score)
                     {
 
@@ -762,6 +795,15 @@ Hint findBestHint(DeckStack tableau[7],
                             from,
                             amount,
                             to);
+
+                    // Prevent Reverse Loop
+                    if (isReverseMove(lastHint,
+                                      from,
+                                      amount,
+                                      to))
+                    {
+                        score -= 200;
+                    }
 
                     if (score > best.score)
                     {
@@ -808,6 +850,15 @@ Hint findBestHint(DeckStack tableau[7],
                         1,
                         to);
 
+                // Prevent Reverse Loop
+                if (isReverseMove(lastHint,
+                                  0,
+                                  1,
+                                  to))
+                {
+                    score -= 200;
+                }
+
                 if (score > best.score)
                 {
 
@@ -841,6 +892,15 @@ Hint findBestHint(DeckStack tableau[7],
                         0,
                         1,
                         to);
+
+                // Prevent Reverse Loop
+                if (isReverseMove(lastHint,
+                                  0,
+                                  1,
+                                  to))
+                {
+                    score -= 200;
+                }
 
                 if (score > best.score)
                 {
@@ -1260,10 +1320,12 @@ void undoLastMove(DeckStack tableau[7],
     free(u);
 }
 // PRINT 1, 11, 12, 13 TO A, J, Q, K
-const char* getRankStr(int rank) {
-    static const char* ranks[] = {"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
-    
-    if (rank >= 1 && rank <= 13) {
+const char *getRankStr(int rank)
+{
+    static const char *ranks[] = {"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+
+    if (rank >= 1 && rank <= 13)
+    {
         return ranks[rank];
     }
     return "?"; // <- For invalid ranks
@@ -1619,6 +1681,7 @@ int main()
                        h.from,
                        h.amount,
                        h.to);
+                lastHint = h;
             }
         }
 
@@ -1677,26 +1740,6 @@ int main()
             printf("\n=-=-=-=-=-=-=-=-=-=-=\n");
             printf("CONGRATULATIONS!\n");
             printf("YOU WON SOLITAIRE!\n");
-            printf("=-=-=-=-=-=-=-=-=-=-=\n");
-
-            break;
-        }
-
-        // GAME OVER CHECK
-
-        Hint gameCheck =
-            findBestHint(
-                tableau,
-                foundation,
-                &waste);
-
-        if (gameCheck.score == -1 &&
-            stock.totalcount == 0)
-        {
-
-            printf("\n=-=-=-=-=-=-=-=-=-=-=\n");
-            printf("NO MORE POSSIBLE MOVES\n");
-            printf("GAME OVER\n");
             printf("=-=-=-=-=-=-=-=-=-=-=\n");
 
             break;
