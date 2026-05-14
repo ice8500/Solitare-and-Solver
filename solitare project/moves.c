@@ -385,18 +385,9 @@ void undoLastMove(DeckStack tableau[7],
                 &foundation[u->from - 8];
         }
 
-        Card *stack =
-            detachWithoutValidation(
-                toStack,
-                u->amount);
-
-        attachStack(
-            fromStack,
-            stack);
-
+        // Re-hide previously flipped card FIRST
         if (u->flippedCard)
         {
-
             Card *bottom =
                 getBottomCard(fromStack);
 
@@ -405,6 +396,15 @@ void undoLastMove(DeckStack tableau[7],
                 bottom->Faceup = false;
             }
         }
+
+        Card *stack =
+            detachWithoutValidation(
+                toStack,
+                u->amount);
+
+        attachStack(
+            fromStack,
+            stack);
 
         printf("Move undone\n");
     }
